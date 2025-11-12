@@ -1,0 +1,3 @@
+conda activate v2m4cu12
+# python /public/home/xiaqi2025/video/V2M4/main.py --root exampleDAVIS-debug --output results-exampleDAVIS-debug --model Hunyuan --N 1 --n 0 --skip 5 --seed 42 --use_vggt --use_tracking --tracking_camera_radius 8 --blender_path blender-4.2.1-linux-x64/ > exampleDAVIS-debug.log 2>&1
+nohup python /public/home/xiaqi2025/video/V2M4/main.py --root /inspurfs/group/mayuexin/xiaqi/DAVIS-2017/masked_samples --output /inspurfs/group/mayuexin/xiaqi/DAVIS-2017/V2M4_results --model Hunyuan --N 1 --n 0 --skip 1 --seed 42 --use_vggt > /inspurfs/group/mayuexin/xiaqi/DAVIS-2017/V2M4_results/DAVIS-2017.log2 2>&1 &
