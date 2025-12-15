@@ -126,7 +126,7 @@ class FlowEulerSampler(Sampler):
         t_seq = rescale_t * t_seq / (1 + (rescale_t - 1) * t_seq)
         t_pairs = list((t_seq[i], t_seq[i + 1]) for i in range(steps))
         ret = edict({"samples": None, "pred_x_t": [], "pred_x_0": []})
-        for t, t_prev in tqdm(t_pairs, desc="Sampling", disable=not verbose):
+        for t, t_prev in tqdm(t_pairs, desc="Sampling", disable=True):
             out = self.sample_once(model, sample, t, t_prev, cond, **kwargs)
             sample = out.pred_x_prev
             ret.pred_x_t.append(out.pred_x_prev)
@@ -177,10 +177,10 @@ class FlowEulerSampler(Sampler):
         dreamsim_model, _ = dreamsim(pretrained=True, device=device)
         mask = (refer_image.sum(dim=0) > 0).float()
 
-        for id, (t, t_prev) in tqdm(enumerate(t_pairs), desc="Sampling", disable=not verbose):
+        for id, (t, t_prev) in tqdm(enumerate(t_pairs), desc="Sampling", disable=True):
             # Set lower bound and upper bound for t. The upper bound's setting is because at that stage, the 3D model has formed a coarse shape.
             if optimize_uncond_noise != {} and (0<=t<=0.6):
-                par = tqdm(range(start_optimize_iter + id // 5), desc='Optimizing Uncond Noise', disable=False)
+                par = tqdm(range(start_optimize_iter + id // 5), desc='Optimizing Uncond Noise', disable=True)
                 for i in par:
                     optimizer.zero_grad()
                     out = self.gradient_sample_once(model, sample, t, t_prev, cond, **kwargs)

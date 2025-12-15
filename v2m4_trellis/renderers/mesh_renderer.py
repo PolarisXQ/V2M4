@@ -149,7 +149,7 @@ class MeshRenderer:
                     mask = dr.antialias((rast[..., -1:] > 0).float(), rast, vertices_clip, faces_int)
                     img = torch.where(mask > 0, img, torch.ones_like(img))
                 except Exception as e:
-                    print(e)
+                    # print(e)
                     continue
 
             if ssaa > 1:

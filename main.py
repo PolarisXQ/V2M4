@@ -794,7 +794,11 @@ if __name__ == "__main__":
                 cropped_image.save(save_path.replace(".png", "_cropped.png"))
 
                 torch.manual_seed(seed)
-                mesh = pipeline(image=cropped_image)[0]
+                try:
+                    mesh = pipeline(image=cropped_image)[0]
+                except Exception as e:
+                    print(f"Error in Hunyuan mesh generation: {e}")
+                    continue
 
                 for cleaner in [FloaterRemover(), DegenerateFaceRemover()]:
                     mesh = cleaner(mesh)

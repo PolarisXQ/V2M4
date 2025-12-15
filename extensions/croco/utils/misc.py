@@ -324,7 +324,8 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
             best_so_far = checkpoint['best_so_far']
             print(" & best_so_far={:g}".format(best_so_far))
         else:
-            print("")
+            pass
+            # print("")
         print("With optim & sched! start_epoch={:d}".format(args.start_epoch), end='')
     return best_so_far
 

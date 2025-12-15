@@ -1,7 +1,8 @@
 import os
 import sys
-sys.path.append("/public/home/xiaqi2025/video/V2M4")
-
+sys.path.append("/inspurfs/group/mayuexin/xiaqi/V2M4")
+sys.path.append("/inspurfs/group/mayuexin/xiaqi/V2M4/extensions")
+os.environ['TORCH_CUDA_ARCH_LIST'] = "86"
 import numpy as np
 import trimesh
 import torch
@@ -205,7 +206,7 @@ class MeshLoader:
                 elif light_direction == 'right':
                     light_dir = [-1.0, 0, 0]
                 else:
-                    print(f"Invalid light direction: {light_direction}, using default direction")
+                    # print(f"Invalid light direction: {light_direction}, using default direction")
                     light_dir = [0, 0, -1.0]
             light_dir_tensor = torch.tensor(light_dir, dtype=torch.float32, device=device)
             light_dir_tensor = F.normalize(light_dir_tensor, dim=0)
@@ -225,7 +226,7 @@ class MeshLoader:
                 elif light_location == 'left':
                     light_loc_tensor = mesh_center - torch.tensor([1.0, 0, 0], dtype=torch.float32, device=device)
                 else:
-                    print(f"Invalid light location: {light_location}, using default location")
+                    # print(f"Invalid light location: {light_location}, using default location")
                     light_loc_tensor = mesh_center + torch.tensor([0, 0, 1.0], dtype=torch.float32, device=device)
             to_light = light_loc_tensor.unsqueeze(0) - lighted_mesh.vertices
             distance = torch.norm(to_light, dim=1, keepdim=True).clamp_min(1e-6)
@@ -419,7 +420,19 @@ class MeshLoader:
         rend_img = result['color'][0]
         imageio.imsave(output_filename.replace('_no_light.png', '_right_directional_light.png'), rend_img)
 
-    def render(self, mesh, params, rotation_angle_deg, light_type, light_location, light_direction, ambient_color, diffuse_color, specular_color):
+    def render(
+        self,
+        mesh,
+        params,
+        rotation_angle_deg,
+        light_type,
+        light_location,
+        light_direction,
+        ambient_color,
+        diffuse_color,
+        specular_color,
+        verbose=False,
+    ):
         """
         Render the model with the given rotation angle, light type, light location, light direction, ambient color, diffuse color, specular color.
 
@@ -524,39 +537,71 @@ class MeshLoader:
             lighted_mesh = rotated_mesh
         else:
             raise ValueError(f"Invalid light type: {light_type}")
-
-        result = render_frames(lighted_mesh, extr, intr_batch, render_options)
+        result = render_frames(
+            lighted_mesh, extr, intr_batch, render_options, verbose=False
+        )
         rend_img = result['color'][0]
         return rend_img
 
-    def load_mesh_and_render(self, major_class_name, frame_index, render_config:list[RenderConfig]):
+    def load_mesh_and_render(
+        self,
+        major_class_name,
+        frame_index,
+        render_config: list[RenderConfig],
+        frame_selecting_strategy="farthest",
+        verbose=False,
+    ):
         """
         Load the mesh and render the model with the given render configuration.
 
         Args:
             major_class_name: The name of the major class
-            frame_index: The index of the frame, selected from 'head', 'tail', 'middle' (recommended) or a 5 digits with leading zeros string
+            frame_index: The index of the frame, selected from 'head', 'tail', 'middle' or a 5 digits with leading zeros string
             render_config: The configuration for the render, a list of RenderConfig objects
-        
+            frame_selecting_strategy: The strategy for selecting the frame, only valid when frame_index is a 5 digits with leading zeros string
+                "exact": select the frame with the exact index, may lead to error if the frame is not available
+                "farthest": select the frame with the farthest index from the current frame
+                "nearest": select the frame with the nearest index from the current frame
+                "random": select the frame randomly from the available frames
         Returns:
             len(render_config) rendered images, each image is a numpy array of shape (512, 512, 3)
         """
         # cope with frame_index
+        glb_files = [f for f in os.listdir(os.path.join(self.data_root, major_class_name)) if f.endswith("_re-canonicalization_textured_sample.glb")]
+        avail_frame_indices = [f.split("_")[0] for f in glb_files]
+        avail_frame_indices = [int(f) for f in avail_frame_indices]
+        avail_frame_indices.sort()
         if frame_index in ["head", "tail", "middle"]:
-            # get availale frame indices
-            # find file end with _re-canonicalization_textured_sample.glb
-            glb_files = [f for f in os.listdir(os.path.join(self.data_root, major_class_name)) if f.endswith("_re-canonicalization_textured_sample.glb")]
-            frame_indices = [f.split("_")[0] for f in glb_files]
-            frame_indices = [int(f) for f in frame_indices]
-            frame_indices.sort()
             if frame_index == "head":
-                frame_index = frame_indices[0]
+                frame_index = avail_frame_indices[0]
             elif frame_index == "tail":
-                frame_index = frame_indices[-1]
+                frame_index = avail_frame_indices[-1]
             else:
-                frame_index = frame_indices[1]
+                frame_index = avail_frame_indices[1]
             # format to 5 digits
             frame_index = str(frame_index).zfill(5)
+        else:
+            frame_index_int = int(frame_index)
+            frame_indices_int = [int(f) for f in avail_frame_indices]
+            frame_indices_arr = np.array(frame_indices_int)
+            if frame_selecting_strategy == "farthest":
+                frame_index = frame_indices_int[np.argmax(np.abs(frame_indices_arr - frame_index_int))]
+            elif frame_selecting_strategy == "nearest":
+                frame_index = frame_indices_int[np.argmin(np.abs(frame_indices_arr - frame_index_int))]
+            elif frame_selecting_strategy == "random":
+                frame_index = np.random.choice(frame_indices_int)
+            elif frame_selecting_strategy == "exact":
+                # check if the frame is available
+                if frame_index_int not in frame_indices_int:
+                    # print(f"Frame {frame_index} is not available, fallback to farthest strategy.")
+                    frame_index = frame_indices_int[np.argmax(np.abs(frame_indices_arr - frame_index_int))]
+                else:
+                    frame_index = frame_index_int
+            else:
+                raise ValueError(f"Invalid frame selecting strategy: {frame_selecting_strategy}")
+            frame_index = str(frame_index).zfill(5)
+
+        # print(f"Selected frame index with {frame_selecting_strategy} strategy: {frame_index}")
 
         mesh = self.load_mesh(major_class_name, frame_index)
         params = self.load_camera_parameters(major_class_name, frame_index)
@@ -566,7 +611,18 @@ class MeshLoader:
                 mesh = self.align_mesh_bbox_to_x_axis(mesh)
             if not config.texture:
                 mesh = self.get_mesh_without_texture(mesh)
-            rendered_image = self.render(mesh, params, config.rotation_angle_deg, config.light_type, config.light_location, config.light_direction, config.ambient_color, config.diffuse_color, config.specular_color)
+            rendered_image = self.render(
+                mesh,
+                params,
+                config.rotation_angle_deg,
+                config.light_type,
+                config.light_location,
+                config.light_direction,
+                config.ambient_color,
+                config.diffuse_color,
+                config.specular_color,
+                verbose=verbose,
+            )
             rendered_images.append(rendered_image)
         return rendered_images
 
@@ -575,19 +631,20 @@ if __name__ == "__main__":
     render_configs = [RenderConfig(rotation_angle_deg=0, texture=True, align_to_x_axis=True,
                                   light_type='none'),
                                   RenderConfig(rotation_angle_deg=90, texture=True, align_to_x_axis=True,
-                                  light_type='directional', light_direction='front'),
+                                  light_type='none'),
                                   RenderConfig(rotation_angle_deg=180, texture=True, align_to_x_axis=True,
-                                  light_type='directional', light_direction='back'),
+                                  light_type='none'),
                                   RenderConfig(rotation_angle_deg=270, texture=True, align_to_x_axis=True,
-                                  light_type='directional', light_direction='left'),
-                                  RenderConfig(rotation_angle_deg=60, texture=True, align_to_x_axis=False,
-                                  light_type='none') ,
-                                  RenderConfig(rotation_angle_deg=-60, texture=True, align_to_x_axis=False,
-                                  light_type='none') ,
-                                  RenderConfig(rotation_angle_deg=120, texture=False, align_to_x_axis=False,
-                                  light_type='point', light_location='front'),
-                                  RenderConfig(rotation_angle_deg=-120, texture=False, align_to_x_axis=False,
-                                  light_type='point', light_location='front')]
+                                  light_type='none'),
+                                #   RenderConfig(rotation_angle_deg=60, texture=True, align_to_x_axis=False,
+                                #   light_type='none') ,
+                                #   RenderConfig(rotation_angle_deg=-60, texture=True, align_to_x_axis=False,
+                                #   light_type='none') ,
+                                #   RenderConfig(rotation_angle_deg=120, texture=False, align_to_x_axis=False,
+                                #   light_type='point', light_location='front'),
+                                #   RenderConfig(rotation_angle_deg=-120, texture=False, align_to_x_axis=False,
+                                #   light_type='point', light_location='front'),
+                                  ]
     rendered_images = mesh_loader.load_mesh_and_render("bear", "head", render_configs)
     os.makedirs("bear_renders", exist_ok=True)
     for i, rendered_image in enumerate(rendered_images):

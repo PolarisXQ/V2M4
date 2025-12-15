@@ -19,13 +19,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-path",
         type=str,
-        default="/inspurfs/group/mayuexin/yaoych/LP/Dataset/DAVIS-2017",
+        default="/inspurfs/group/mayuexin/yaoych/LP/Dataset/vots2022-davis-format",
         help="Root directory of the DAVIS-2017 dataset.",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="/inspurfs/group/mayuexin/xiaqi/DAVIS-2017/masked_samples",
+        default="/inspurfs/group/mayuexin/xiaqi/vots2022/masked_samples",
         help="Directory where the masked frames will be written.",
     )
     return parser.parse_args()

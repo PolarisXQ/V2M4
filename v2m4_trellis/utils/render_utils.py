@@ -2,7 +2,7 @@ import sys
 sys.path.append('./extensions')
 import torch
 import numpy as np
-from tqdm import tqdm
+# from tqdm import tqdm
 import utils3d
 from PIL import Image
 import lpips
@@ -74,7 +74,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
     niter = 300
 
     if not using_vggt:
-        print('Using Dust3R to get better initial guess') 
+        # print('Using Dust3R to get better initial guess') 
         model_name = "naver/DUSt3R_ViTLarge_BaseDecoder_512_dpt"
         # you can put the path to a local checkpoint in model_name if needed
         model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
@@ -95,7 +95,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
         # poses = scene.get_im_poses().detach()
         pts3d = torch.stack(scene.get_pts3d(), dim=0).detach()
     else:
-        print('Using VGGT to get better initial guess') 
+        # print('Using VGGT to get better initial guess') 
         # bfloat16 is supported on Ampere GPUs (Compute Capability 8.0+) 
         dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 
@@ -162,12 +162,12 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
     
     optimizer = torch.optim.Adam([rot6D, translation, scale], lr=0.01)
 
-    pbar = tqdm(range(2000), desc=f'Aligning with {"VGGT" if using_vggt else "Dust3R"} position', disable=False)
+    # pbar = tqdm(range(2000), desc=f'Aligning with {"VGGT" if using_vggt else "Dust3R"} position', disable=True)
 
     rotZ180 = torch.tensor([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]], device=device)
 
     bf_flip_loss_params = {'loss': torch.inf, 'params': None}
-    for i in pbar:
+    for i in range(2000):
         optimizer.zero_grad()
 
         rotation_matrix = rotation_6d_to_matrix(rot6D)
@@ -179,16 +179,16 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
         loss.backward()
         optimizer.step()
 
-        pbar.set_postfix({'loss': loss.item()})  
+        # pbar.set_postfix({'loss': loss.item()})  
 
         # This is to avoid the local minimum where the rotation matrix is trapped in 180 degree rotation around z-axis
-        if i == len(pbar) * 3 // 4:
+        if i == 2000 * 3 // 4:
             bf_flip_loss_params['loss'] = loss.item()
             bf_flip_loss_params['params'] = {'rot6D': rot6D.data.clone(), 'translation': translation.data.clone(), 'scale': scale.data.clone()}
 
             rot6D.data = (rotZ180 @ rotation_matrix)[:2].flatten()
             translation.data = translation @ rotZ180.T
-            print('Flip the rotation matrix')
+            # print('Flip the rotation matrix')
             continue                      
 
     with torch.no_grad():
@@ -196,7 +196,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
             rot6D.data = bf_flip_loss_params['params']['rot6D']
             translation.data = bf_flip_loss_params['params']['translation']
             scale.data = bf_flip_loss_params['params']['scale']
-            print('Use the non-flipped parameters')
+            # print('Use the non-flipped parameters')
 
         rotation_matrix = rotation_6d_to_matrix(rot6D)
         transformed_pts3d = pred_pts3d @ rotation_matrix.T * scale + translation
@@ -228,7 +228,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
 
     optimizer = torch.optim.Adam([rot3D, translation], lr=0.01)
 
-    pbar = tqdm(range(500), desc='Re-projecting reference image points', disable=False)
+    # pbar = tqdm(range(500), desc='Re-projecting reference image points', disable=True)
 
     intrinsic = params['intrinsics']
     renderer = params['renderer']
@@ -236,7 +236,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
     far = renderer.rendering_options["far"]
     resolution = renderer.rendering_options["resolution"]
 
-    for i in pbar:
+    for i in range(500):
         optimizer.zero_grad()
 
         z = rot3D
@@ -280,7 +280,7 @@ def dust3r_getting_better_initial_guess(images, prior_poses, gt_pts3d, device='c
         loss.backward()
         optimizer.step()
 
-        pbar.set_postfix({'loss': loss.item()})
+        # pbar.set_postfix({'loss': loss.item()})
 
     # with torch.no_grad():
     #     converted_pcd = (optim_converted_pcd + 1) * resolution / 2
@@ -426,7 +426,8 @@ def particle_swarm_optimization(fitness_function, bounds, num_particles=200, max
             '''Concat with the initial samples, that is 1 + (num_samples - 1) = num_samples samples'''
             swarm = torch.cat([aligned_swarm, swarm[:num_particles-1]], dim=0)
         except:
-            print({'Dust3R' if not use_vggt else 'VGGT'} + 'failed to get a better initial guess, use the initial samples')
+            # print({'Dust3R' if not use_vggt else 'VGGT'} + 'failed to get a better initial guess, use the initial samples')
+            pass
 
         scores, renderings = fitness_function(swarm, renderer)
 
@@ -442,8 +443,8 @@ def particle_swarm_optimization(fitness_function, bounds, num_particles=200, max
     global_best = None
     global_best_score = float('inf')
 
-    par = tqdm(range(max_iter), desc='PSO Optimization', disable=False)
-    for _ in par:
+    # par = tqdm(range(max_iter), desc='PSO Optimization', disable=True)
+    for _ in range(max_iter):
         velocities = torch.empty((num_particles, dim), device='cuda').uniform_(-1, 1)
 
         # Compute fitness scores for all particles in parallel
@@ -465,7 +466,7 @@ def particle_swarm_optimization(fitness_function, bounds, num_particles=200, max
         velocities = 0.5 * velocities + r1 * (personal_best - swarm) + r2 * (global_best - swarm)
         swarm += velocities
 
-        par.set_postfix({'best_score': global_best_score})
+        # par.set_postfix({'best_score': global_best_score})
 
     scores, renderings = fitness_function(global_best.unsqueeze(0).repeat(2,1), renderer)
 
@@ -550,7 +551,7 @@ def render_frames(sample, extrinsics, intrinsics, options={}, colors_overwrite=N
         raise ValueError(f'Unsupported sample type: {type(sample)}')
     
     rets = {}
-    for j, (extr, intr) in tqdm(enumerate(zip(extrinsics, intrinsics)), desc='Rendering', disable=not verbose):
+    for j, (extr, intr) in enumerate(zip(extrinsics, intrinsics)):
         if not isinstance(sample, MeshExtractResult):
             res = renderer.render(sample, extr, intr, colors_overwrite=colors_overwrite)
             if 'color' not in rets: rets['color'] = []
@@ -788,8 +789,8 @@ def find_closet_camera_pos(sample, rmbg_image, resolution=518, bg_color=(0, 0, 0
     optimizer = torch.optim.Adam([yaw, pitch, lookat, r], lr=0.01)
     
     '''Gradient Descent Optimization is unstable here, sometimes will totally destroy the good position found by PSO, thus disable it'''
-    par = tqdm(range(300), desc='Aligning', disable=False)
-    for iter in par:
+    # par = tqdm(range(300), desc='Aligning', disable=True)
+    for iter in range(300):
         extr, intr = optimize_yaw_pitch_r_fov_to_extrinsics_intrinsics(yaw, pitch, r, fov, lookat)
 
         if not isinstance(sample, MeshExtractResult):
@@ -800,7 +801,7 @@ def find_closet_camera_pos(sample, rmbg_image, resolution=518, bg_color=(0, 0, 0
         # loss_boundary: ensure the mask region of rendering and rmbg_image are the same with the loss weight of total_img_size / mask_size
         loss = torch.nn.MSELoss()(res['mask'], mask.expand(res['mask'].shape)) * (mask.numel() / mask.sum())
 
-        par.set_postfix({'loss': loss.item()})
+        # par.set_postfix({'loss': loss.item()})
 
         optimizer.zero_grad()
         loss.backward()

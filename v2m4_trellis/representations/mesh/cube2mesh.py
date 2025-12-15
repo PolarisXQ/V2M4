@@ -5,7 +5,8 @@ from .utils_cube import *
 try:
     from .flexicubes.flexicubes import FlexiCubes
 except:
-    print("Please install kaolin and diso to use the mesh extractor.")
+    # print("Please install kaolin and diso to use the mesh extractor.")
+    pass
 
 
 class MeshExtractResult:

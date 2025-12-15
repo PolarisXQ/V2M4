@@ -71,7 +71,7 @@ def _fill_holes(
     # Rasterize
     visblity = torch.zeros(faces.shape[0], dtype=torch.int32, device=verts.device)
     rastctx = utils3d.torch.RastContext(backend='cuda')
-    for i in tqdm(range(views.shape[0]), total=views.shape[0], disable=not verbose, desc='Rasterizing'):
+    for i in tqdm(range(views.shape[0]), total=views.shape[0], disable=True, desc='Rasterizing'):
         view = views[i]
         buffers = utils3d.torch.rasterize_triangle_faces(
             rastctx, verts[None], faces, resolution, resolution, view=view, projection=projection
@@ -322,7 +322,7 @@ def bake_texture(
         texture = torch.zeros((texture_size * texture_size, 3), dtype=torch.float32).cuda()
         texture_weights = torch.zeros((texture_size * texture_size), dtype=torch.float32).cuda()
         rastctx = utils3d.torch.RastContext(backend='cuda')
-        for observation, view, projection in tqdm(zip(observations, views, projections), total=len(observations), disable=not verbose, desc='Texture baking (fast)'):
+        for observation, view, projection in tqdm(zip(observations, views, projections), total=len(observations), disable=True, desc='Texture baking (fast)'):
             with torch.no_grad():
                 rast = utils3d.torch.rasterize_triangle_faces(
                     rastctx, vertices[None], faces, observation.shape[1], observation.shape[0], uv=uvs[None], view=view, projection=projection
@@ -352,7 +352,7 @@ def bake_texture(
         masks = [m.flip(0) for m in masks]
         _uv = []
         _uv_dr = []
-        for observation, view, projection in tqdm(zip(observations, views, projections), total=len(views), disable=not verbose, desc='Texture baking (opt): UV'):
+        for observation, view, projection in tqdm(zip(observations, views, projections), total=len(views), disable=True, desc='Texture baking (opt): UV'):
             with torch.no_grad():
                 rast = utils3d.torch.rasterize_triangle_faces(
                     rastctx, vertices[None], faces, observation.shape[1], observation.shape[0], uv=uvs[None], view=view, projection=projection
@@ -374,7 +374,7 @@ def bake_texture(
                    torch.nn.functional.l1_loss(texture[:, :, :-1, :], texture[:, :, 1:, :])
     
         total_steps = 2500
-        with tqdm(total=total_steps, disable=not verbose, desc='Texture baking (opt): optimizing') as pbar:
+        with tqdm(total=total_steps, disable=True, desc='Texture baking (opt): optimizing') as pbar:
             for step in range(total_steps):
                 optimizer.zero_grad()
                 selected = np.random.randint(0, len(views))
@@ -424,7 +424,7 @@ def bake_vertice_color(
     rast_outs = []
     rast_dbs = []
     pos_clips = []
-    for observation, view, projection in tqdm(zip(observations, views, projections), total=len(views), disable=not verbose, desc='Vertices Texture baking (opt): UV'):
+    for observation, view, projection in tqdm(zip(observations, views, projections), total=len(views), disable=True, desc='Vertices Texture baking (opt): UV'):
         with torch.no_grad():
             height, width = observation.shape[1], observation.shape[0]
             
@@ -452,7 +452,7 @@ def bake_vertice_color(
         return end_lr + 0.5 * (start_lr - end_lr) * (1 + np.cos(np.pi * step / total_steps))
 
     total_steps = 1000
-    with tqdm(total=total_steps, disable=not verbose, desc='Vertices Color baking (opt): optimizing') as pbar:
+    with tqdm(total=total_steps, disable=True, desc='Vertices Color baking (opt): optimizing') as pbar:
         for step in range(total_steps):
             optimizer.zero_grad()
             selected = np.random.randint(0, len(views))
